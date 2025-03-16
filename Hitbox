@@ -1,0 +1,38 @@
+-- Đảm bảo script này chạy trên client trong Roblox
+
+local player = game.Players.LocalPlayer  -- Lấy người chơi hiện tại
+local character = player.Character or player.CharacterAdded:Wait()  -- Nhân vật của người chơi
+local humanoid = character:WaitForChild("Humanoid")  -- Lấy Humanoid của nhân vật
+local attack_range = 50  -- Bán kính tấn công (đơn vị Roblox)
+
+-- Hàm tính khoảng cách giữa hai điểm
+local function distance(pos1, pos2)
+    return (pos1 - pos2).magnitude  -- Trả về khoảng cách Euclidean
+end
+
+-- Hàm tấn công các đối tượng xung quanh trong phạm vi
+local function attackNearbyEnemies()
+    -- Lấy tất cả các đối tượng trong game
+    local enemies = workspace:GetChildren()
+
+    for _, enemy in ipairs(enemies) do
+        -- Kiểm tra nếu đối tượng là kẻ thù (có thể kiểm tra theo tên hoặc loại)
+        if enemy:IsA("Model") and enemy:FindFirstChild("Humanoid") and enemy ~= character then
+            local enemyPosition = enemy.PrimaryPart.Position
+            local playerPosition = character.PrimaryPart.Position
+
+            local dist = distance(playerPosition, enemyPosition)
+            if dist <= attack_range then
+                -- Nếu đối tượng trong phạm vi, tiến hành tấn công (in ra thông báo)
+                print("Tấn công " .. enemy.Name .. " với khoảng cách " .. dist)
+                -- Bạn có thể thêm hành động tấn công ở đây, như giảm HP của kẻ thù
+            end
+        end
+    end
+end
+
+-- Kiểm tra tấn công liên tục
+while true do
+    attackNearbyEnemies()
+    wait(1)  -- Cập nhật mỗi giây
+end
