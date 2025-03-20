@@ -1,0 +1,153 @@
+
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+-- Check if we're running on server or client
+if RunService:IsServer() then
+    -----------------------
+    -- SERVER-SIDE CODE --
+    -----------------------
+    
+    -- Require the server module
+    local HitboxSystemServer = require(script.Parent.HitboxSystem_Server)
+    
+    -- Create a hitbox for a weapon
+    local function setupWeaponHitbox(weapon)
+        -- Create a hitbox with size 1000x1000x1000
+        local hitbox = HitboxSystemServer.new(workspace, Vector3.new(1000, 1000, 1000), nil, 25, 0.5)
+        
+        -- Attach it to the weapon
+        hitbox:attachTo(weapon)
+        
+        -- Store the hitbox in the weapon for later reference
+        weapon:SetAttribute("HitboxId", hitbox.serverId)
+        
+        -- Set up collision detection and damage
+        hitbox:addListener("playerEntered", function(humanoid)
+            print("Player entered weapon hitbox area")
+        end)
+        
+        hitbox:addListener("playerLeft", function(humanoid)
+            print("Player left weapon hitbox area")
+        end)
+        
+        hitbox:addListener("damage", function(humanoid)
+            print("Weapon dealt damage! Player health: " .. humanoid.Health)
+        end)
+        
+        return hitbox
+    end
+    
+    -- When a player joins, give them a weapon with a hitbox
+    Players.PlayerAdded:Connect(function(player)
+        -- Wait for character to load
+        player.CharacterAdded:Connect(function(character)
+            wait(1) -- Give time for character to fully load
+            
+            -- Create a weapon for this player
+            local weapon = Instance.new("Part")
+            weapon.Name = "LargeWeapon"
+            weapon.Size = Vector3.new(5, 1, 5)
+            weapon.Anchored = false
+            weapon.CanCollide = true
+            weapon.BrickColor = BrickColor.new("Really red")
+            
+            -- Add a special property to identify this as a weapon
+            weapon:SetAttribute("IsWeapon", true)
+            
+            -- Create a weld to attach to right hand
+            local rightHand = character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm")
+            if rightHand then
+                weapon.Position = rightHand.Position + Vector3.new(0, 0, 3)
+                
+                local weld = Instance.new("WeldConstraint")
+                weld.Part0 = rightHand
+                weld.Part1 = weapon
+                weld.Parent = weapon
+                
+                weapon.Parent = workspace
+                
+                -- Create a hitbox for this weapon
+                local hitbox = setupWeaponHitbox(weapon)
+                print("Created weapon with hitbox for player: " .. player.Name)
+            end
+        end)
+    end)
+    
+    print("HitboxSystem Server Example running")
+    
+else
+    -----------------------
+    -- CLIENT-SIDE CODE --
+    -----------------------
+    
+    -- Require the client module
+    local HitboxSystemClient = require(script.Parent.HitboxSystem_Client)
+    
+    -- Get the local player
+    local player = Players.LocalPlayer
+    
+    -- Handle player input to trigger attacks
+    local function setupAttackControls()
+        -- Create a local function to handle attacks
+        local function activateWeaponHitbox()
+            -- Find the player's weapon
+            local character = player.Character
+            if not character then return end
+            
+            -- Find the weapon part
+            local weapon
+            for _, child in pairs(workspace:GetChildren()) do
+                if child:IsA("Part") and child:GetAttribute("IsWeapon") and 
+                   child:FindFirstChild("WeldConstraint") and 
+                   child.WeldConstraint.Part0 and
+                   character:IsAncestorOf(child.WeldConstraint.Part0) then
+                    weapon = child
+                    break
+                end
+            end
+            
+            if not weapon then
+                print("No weapon found for attack")
+                return
+            end
+            
+            -- Create a client-side hitbox for visualization if needed
+            local clientHitbox = HitboxSystemClient.new(workspace, Vector3.new(1000, 1000, 1000))
+            clientHitbox:attachTo(weapon)
+            
+            -- Activate the attack with visual effect
+            clientHitbox:activateDamage()
+            
+            -- Clean up the client hitbox after the effect is done
+            wait(1)
+            clientHitbox:destroy()
+        end
+        
+        -- Connect to input events
+        UserInputService.InputBegan:Connect(function(input, gameProcessed)
+            if gameProcessed then return end
+            
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or
+               input.KeyCode == Enum.KeyCode.E then
+                -- Left click or E key activates attack
+                activateWeaponHitbox()
+            end
+        end)
+        
+        print("Attack controls set up for local player")
+    end
+    
+    -- Set up attack controls when character loads
+    if player.Character then
+        setupAttackControls()
+    end
+    
+    player.CharacterAdded:Connect(function()
+        setupAttackControls()
+    end)
+    
+    print("HitboxSystem Client Example running")
+end
